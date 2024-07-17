@@ -1,0 +1,42 @@
+version: '3.9'
+name: users_app_dev
+services:
+  users_db:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - ./users_db-data:/var/lib/postgresql/data
+    networks:
+      - users-dev
+
+  users_api:
+    build:
+      context: ./
+      dockerfile: ./backend/users/Dockerfile
+    command:  bash -c 'while !</dev/tcp/users_db/5432; do sleep 1; done;
+      alembic -c backend/users/alembic.ini upgrade head;
+      uvicorn backend.users.main:app --reload --log-config backend/users/config/log.ini --host 0.0.0.0 --port 8000'
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/common:/fastapi_jwt_sample/backend/common
+      - ./backend/users:/fastapi_jwt_sample/backend/users
+      - ./logs-data:/fastapi_jwt_sample/logs
+    environment:
+      - POSTGRES_HOST=users_db
+      - LOG_FILE_PATH=logs/users.log
+    depends_on:
+      - "users_db"
+    networks:
+      - users-dev
+
+networks:
+  users-dev:
+    driver: bridge
+
+volumes:
+  users_db-data:
+  logs-data:
